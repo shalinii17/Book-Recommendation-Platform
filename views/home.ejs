@@ -1,0 +1,140 @@
+<%- include("partials/header.ejs") %>
+
+<div class="container mt-4">
+    <div class="d-flex justify-content-end align-items-center mb-3">
+        <% if (user) { %>
+            <div>
+                <a href="/profile" class="btn btn-outline-primary">My Profile</a>
+                <a href="/logout" class="btn btn-danger">Logout</a>
+            </div>
+        <% } else { %>
+            <div>
+                <a href="/login" class="btn btn-outline-secondary">Login</a>
+                <a href="/signup" class="btn btn-outline-secondary">Sign Up</a>
+            </div>
+        <% } %>
+    </div>
+
+    <form action="/" method="GET" class="row g-3 mb-3">
+        <div class="col-md-4">
+            <input type="text" name="query" class="form-control" placeholder="Search by title or author" value="<%= query || '' %>">
+        </div>
+        <div class="col-md-3">
+            <input type="text" name="genre" class="form-control" placeholder="Genre" value="<%= genre || '' %>">
+        </div>
+        <div class="col-md-2">
+            <input type="number" name="rating" step="0.1" min="1" max="5" class="form-control" placeholder="Min rating" value="<%= rating || '' %>">
+        </div>
+        
+        <input type="hidden" name="page" value="1"> 
+        
+        <div class="col-md-1">
+            <button class="btn btn-primary w-100">Search</button>
+        </div>
+        <div class="col-md-2">
+            <a href="/" class="btn btn-secondary w-100">Clear</a>
+        </div>
+    </form>
+
+    <table class="table table-bordered table-striped text-center align-middle book-table">
+        <thead class="table-dark">
+            <tr>
+                <th>Cover</th>
+                <th>Book Name</th>
+                <th>Author</th>
+                <th>Description</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            <% if (books && books.length > 0) { %>
+                <% books.forEach(book => { %>
+                    <tr>
+                        <td class="cover-cell">
+                            <% if (book.cover_url) { %>
+                                <img src="<%= book.cover_url %>" alt="cover" class="book-cover">
+                            <% } else { %>
+                                <span>No Cover</span>
+                            <% } %>
+                        </td>
+                        <td class="title-cell">
+                            <span title="<%= book.title %>"><%= book.title %></span>
+                        </td>
+
+                        <td class="author-cell">
+                            <span title="<%= book.author %>"><%= book.author %></span>
+                        </td>
+
+                        <td class="description-cell">
+                            <span title="<%= book.description || '' %>">
+                                <%= book.description ? (book.description.length > 100 ? book.description.slice(0, 100) + "..." : book.description) : "" %>
+                            </span>
+                        </td>
+
+                        <td>
+                            <% if (user) { %>
+                                <form action="/mark" method="POST" style="display:inline">
+                                    <input type="hidden" name="book_id" value="<%= book.id %>">
+                                    <input type="hidden" name="action" value="read">
+                                    <input type="hidden" name="redirect" value="/">
+                                    <button class="btn btn-sm btn-outline-primary">Mark Read</button>
+                                </form>
+                                <form action="/mark" method="POST" style="display:inline">
+                                    <input type="hidden" name="book_id" value="<%= book.id %>">
+                                    <input type="hidden" name="action" value="recommend">
+                                    <input type="hidden" name="redirect" value="/">
+                                    <button class="btn btn-sm btn-outline-success">Recommend</button>
+                                </form>
+                                <form action="/mark" method="POST" style="display:inline">
+                                    <input type="hidden" name="book_id" value="<%= book.id %>">
+                                    <input type="hidden" name="action" value="save">
+                                    <input type="hidden" name="redirect" value="/">
+                                    <button class="btn btn-sm btn-outline-warning">Save</button>
+                                </form>
+                            <% } else { %>
+                                <small><a href="/login">Login to save</a></small>
+                            <% } %>
+                        </td>
+                    </tr>
+                <% }) %>
+            <% } else { %>
+                <tr><td colspan="6">No books found matching your criteria.</td></tr>
+            <% } %>
+        </tbody>
+    </table>
+    
+    <nav aria-label="Page navigation" class="mt-4">
+        <ul class="pagination justify-content-center">
+            
+            <% // 1. Previous Button %>
+            <li class="page-item <%= currentPage <= 1 ? 'disabled' : '' %>">
+                <a class="page-link" 
+                   href="/?query=<%= query || '' %>&genre=<%= genre || '' %>&rating=<%= rating || '' %>&page=<%= currentPage - 1 %>" 
+                   aria-label="Previous">
+                    <span aria-hidden="true">&laquo;</span>
+                </a>
+            </li>
+
+            <% // 2. Current Page Display (Simplified) %>
+            <li class="page-item active">
+                <span class="page-link">
+                    Page <%= currentPage %> of <%= totalPages %>
+                </span>
+            </li>
+
+            <% // 3. Next Button %>
+            <li class="page-item <%= currentPage >= totalPages ? 'disabled' : '' %>">
+                <a class="page-link" 
+                   href="/?query=<%= query || '' %>&genre=<%= genre || '' %>&rating=<%= rating || '' %>&page=<%= currentPage + 1 %>" 
+                   aria-label="Next">
+                    <span aria-hidden="true">&raquo;</span>
+                </a>
+            </li>
+            
+        </ul>
+        <p class="text-center text-muted"><%= totalPages %> pages total.</p>
+    </nav>
+    
+</div>
+
+<%- include("partials/footer.ejs") %>

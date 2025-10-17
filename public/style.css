@@ -1,0 +1,126 @@
+
+
+body {
+  background-color: #F9F3EF;
+  font-family: Arial, sans-serif;
+}
+
+
+
+/* Heading and the para below it  */
+.tagesschrift-regular {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-family: "Tagesschrift", system-ui;
+  font-weight: 400;
+  font-style: normal;
+  font-size: 6rem;
+}
+
+
+.main-para{
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-family: 'Times New Roman', Times, serif;
+  font-size: 1.5rem;
+}
+
+
+
+
+
+
+h1 {
+  color: #333;
+}
+
+table {
+  box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+
+
+
+/* For book cover images in table */
+.book-cover {
+  max-width: 80px;
+  max-height: 100px;
+  width: auto;
+  height: auto;
+  object-fit: cover;
+  display: block;
+  margin: 0 auto; /* center image horizontally in cell */
+}
+
+/* Table layout for book table */
+.book-table {
+  table-layout: fixed;
+  width: 100%;
+}
+
+/* Default cell clipping for all cells */
+.book-table th,
+.book-table td {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  vertical-align: middle;
+}
+
+/* Narrow cover image column */
+.book-table th:nth-child(1),
+.book-table td:nth-child(1) {
+  width: 100px;
+}
+
+/* Title, Genre cell constraints */
+td.title-cell {
+  max-width: 140px; /* adjust smaller to force overflow more */
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+td.rating-cell {
+  max-width: 120px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* Span inside for full width and clipping */
+td.title-cell span,
+td.rating-cell span,
+td.author-cell span,
+td.description-cell span {
+  display: block;
+  width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* Optional hover reveal — simple version (be careful with layout) */
+td.title-cell:hover span,
+td.rating-cell:hover span,
+td.author-cell:hover span,
+td.description-cell:hover span {
+  white-space: normal;
+  overflow: visible;
+  background: #fff;
+  position: relative;
+  z-index: 10;
+  /* maybe set max-width large temporarily */
+  max-width: 400px;
+}
+
+
+
+
+
+
+
