@@ -1,11 +1,15 @@
-
 import express from "express";
 import pg from "pg";
 import dotenv from "dotenv";
-import session from "express-session";
+import expressSession from "express-session"; // Renamed for clarity in PgStore setup
+import connectPgSimple from 'connect-pg-simple'; // NEW: For persistent sessions
 import bcrypt from "bcryptjs";
 import flash from "connect-flash";
+
 dotenv.config();
+
+// Initialize the PostgreSQL Session Store
+const PgStore = connectPgSimple(expressSession); 
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -14,24 +18,6 @@ const port = process.env.PORT || 3000;
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 app.use(express.static("public"));
-
-app.use(
-  session({
-    secret: process.env.SESSION_SECRET || "mysecretkey",
-    resave: false,
-    saveUninitialized: true,
-  })
-);
-
-app.use(flash()); 
-
-// Middleware to make flash messages available to all templates:
-app.use((req, res, next) => {
-  res.locals.success = req.flash("success");  
-  res.locals.error = req.flash("error");
-  next();
-});
-
 
 let dbConfig;
 
@@ -54,9 +40,43 @@ if (process.env.DATABASE_URL) {
   };
 }
 
-const db = new db(dbConfig);
+// ---------------------------------------------------------------------
+// FIX 1: Correct Database Initialization (was: const db = new db(dbConfig);)
+// We use pg.Pool, which is the correct constructor for a server app.
+const db = new pg.Pool(dbConfig); 
 
-await db.connect(); // top-level await allowed in modern node; if not, use .connect().then(...)
+// NOTE: The previous line 'await db.connect();' is now unnecessary and has been removed.
+// ---------------------------------------------------------------------
+
+// ---------------------------------------------------------------------
+// FIX 2: Implement PgStore for production-ready session management
+app.use(
+  expressSession({
+    store: new PgStore({
+      pool: db, // Pass the pg.Pool object here
+      tableName: 'session', // Default table name
+      createTableIfMissing: true, // Will auto-create the 'session' table if needed
+    }),
+    secret: process.env.SESSION_SECRET || "mysecretkey",
+    resave: false,
+    saveUninitialized: false, // Prevents unnecessary sessions
+    cookie: { 
+        maxAge: 30 * 24 * 60 * 60 * 1000, // Session cookie lifetime (30 days)
+        secure: process.env.NODE_ENV === "production" // Ensures secure cookie is sent only over HTTPS (Render)
+    }
+  })
+);
+// ---------------------------------------------------------------------
+
+
+app.use(flash()); 
+
+// Middleware to make flash messages available to all templates:
+app.use((req, res, next) => {
+  res.locals.success = req.flash("success");  
+  res.locals.error = req.flash("error");
+  next();
+});
 
 // make logged-in user available to all templates
 app.use((req, res, next) => {
@@ -155,7 +175,7 @@ app.get("/logout", (req, res) => {
 app.post("/add", requireLogin, async (req, res) => {
   try {
     const { title, author, genre = "", rating } = req.body;
-    const redirectTo = req.body.redirect || "/profile?tab=already";  // default to already read tab
+    const redirectTo = req.body.redirect || "/profile?tab=already";  // default to already read tab
 
     if (!title || !author) {
       return res.send("Title and Author are required to add a book.");
@@ -205,9 +225,9 @@ app.post("/add", requireLogin, async (req, res) => {
     res.redirect(req.body.redirect || "/profile?tab=already");
 
   } catch (err) {
-     console.error("Error adding book", err);
-     req.flash("error", "Could not add the book. Something went wrong.");
-     res.redirect(req.body.redirect || "/profile?tab=already");
+      console.error("Error adding book", err);
+      req.flash("error", "Could not add the book. Something went wrong.");
+      res.redirect(req.body.redirect || "/profile?tab=already");
   }
 });
 
@@ -258,7 +278,7 @@ app.get("/profile", requireLogin, async (req, res) => {
       title: "My Profile",
       tab,
       query: queryTerm,
-      searchedBook: null,   // or set if you want search of main books
+      searchedBook: null,   // or set if you want search of main books
       books: userBooksResult.rows,
     });
   } catch (err) {
@@ -354,62 +374,62 @@ const BOOKS_PER_PAGE = 20;
 
 app.get("/", async (req, res) => {
     try {
-        let { query, genre, page, rating } = req.query;
+      let { query, genre, page, rating } = req.query;
 
-        // --- 1. Sanitize Inputs and Pagination Setup ---
-        query = query ? query.trim() : "";
-        genre = genre ? genre.trim() : "";
-        rating = rating ? Number(rating) : null;
+      // --- 1. Sanitize Inputs and Pagination Setup ---
+      query = query ? query.trim() : "";
+      genre = genre ? genre.trim() : "";
+      rating = rating ? Number(rating) : null;
 
-        const currentPage = page ? parseInt(page) : 1;
-        const offset = (currentPage - 1) * BOOKS_PER_PAGE;
+      const currentPage = page ? parseInt(page) : 1;
+      const offset = (currentPage - 1) * BOOKS_PER_PAGE;
 
-        // --- 2. Build Filtering Logic ---
-        let filterSql = " WHERE TRUE";
-        const params = [];
+      // --- 2. Build Filtering Logic ---
+      let filterSql = " WHERE TRUE";
+      const params = [];
 
-        if (query) {
-            params.push(`%${query}%`);
-            filterSql += ` AND (title ILIKE $${params.length} OR author ILIKE $${params.length})`;
-        }
-        if (genre) {
-            params.push(`%${genre}%`);
-            filterSql += ` AND genre ILIKE $${params.length}`;
-        }
+      if (query) {
+          params.push(`%${query}%`);
+          filterSql += ` AND (title ILIKE $${params.length} OR author ILIKE $${params.length})`;
+      }
+      if (genre) {
+          params.push(`%${genre}%`);
+          filterSql += ` AND genre ILIKE $${params.length}`;
+      }
 
-        // --- 3. Run Count Query ---
-        const countResult = await db.query(`SELECT COUNT(*) FROM books ${filterSql}`, params);
-        const totalBooks = parseInt(countResult.rows[0].count);
-        const totalPages = Math.ceil(totalBooks / BOOKS_PER_PAGE);
+      // --- 3. Run Count Query ---
+      const countResult = await db.query(`SELECT COUNT(*) FROM books ${filterSql}`, params);
+      const totalBooks = parseInt(countResult.rows[0].count);
+      const totalPages = Math.ceil(totalBooks / BOOKS_PER_PAGE);
 
-        // --- 4. Build Final Book Fetch Query ---
-        // Select all key columns including genre & description
-        let bookSql = `
-            SELECT id, title, author, genre, description, cover_url
-            FROM books
-            ${filterSql}
-            ORDER BY display_order ASC NULLS LAST
-            LIMIT $${params.length + 1}
-            OFFSET $${params.length + 2};
-        `;
+      // --- 4. Build Final Book Fetch Query ---
+      // Select all key columns including genre & description
+      let bookSql = `
+          SELECT id, title, author, genre, description, cover_url
+          FROM books
+          ${filterSql}
+          ORDER BY display_order ASC NULLS LAST
+          LIMIT $${params.length + 1}
+          OFFSET $${params.length + 2};
+      `;
 
-        params.push(BOOKS_PER_PAGE);
-        params.push(offset);
+      params.push(BOOKS_PER_PAGE);
+      params.push(offset);
 
-        const result = await db.query(bookSql, params);
+      const result = await db.query(bookSql, params);
 
-        res.render("home.ejs", {
-            title: "Book Recommendation Platform",
-            books: result.rows,
-            query,
-            genre,
-            rating,
-            currentPage,
-            totalPages,
-        });
+      res.render("home.ejs", {
+          title: "Book Recommendation Platform",
+          books: result.rows,
+          query,
+          genre,
+          rating,
+          currentPage,
+          totalPages,
+      });
     } catch (err) {
-        console.error("Error in GET /:", err);
-        res.status(500).send("Error fetching books");
+      console.error("Error in GET /:", err);
+      res.status(500).send("Error fetching books");
     }
 });
 
@@ -427,7 +447,7 @@ app.get("/", async (req, res) => {
 // Profile page (tabbed): ?tab=already|recommend|save and ?query=...
 // In app.js
 
-// This is part of your GET /profile route (or replace the old profile route)  
+// This is part of your GET /profile route (or replace the old profile route)  
 // app.js
 
 // … inside your existing code …
@@ -435,10 +455,10 @@ app.get("/", async (req, res) => {
 app.get("/profile", requireLogin, async (req, res) => {
   try {
     const userId = req.session.user.id;
-    const tab = req.query.tab || "already";  // 'already', 'recommend', 'save'
+    const tab = req.query.tab || "already";  // 'already', 'recommend', 'save'
     const queryTerm = req.query.query?.trim() || "";
 
-    let searchedBook = null;  // default: no search yet or not found
+    let searchedBook = null;  // default: no search yet or not found
     if (queryTerm) {
       const sb = await db.query(
         `SELECT * FROM books
