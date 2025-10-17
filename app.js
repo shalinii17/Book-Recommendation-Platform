@@ -32,14 +32,30 @@ app.use((req, res, next) => {
   next();
 });
 
-// DB connection
-const db = new pg.Client({
-  user: process.env.DB_USER,
-  host: process.env.DB_HOST,
-  database: process.env.DB_NAME,
-  password: process.env.DB_PASSWORD,
-  port: process.env.DB_PORT,
-});
+
+let dbConfig;
+
+if (process.env.DATABASE_URL) {
+  // Use the single connection string provided by Render
+  dbConfig = {
+    connectionString: process.env.DATABASE_URL,
+    ssl: {
+      rejectUnauthorized: false // Required for Render to connect securely
+    }
+  };
+} else {
+  // Fallback for local development
+  dbConfig = {
+    user: process.env.DB_USER,
+    host: process.env.DB_HOST,
+    database: process.env.DB_NAME,
+    password: process.env.DB_PASSWORD,
+    port: process.env.DB_PORT,
+  };
+}
+
+const db = new db(dbConfig);
+
 await db.connect(); // top-level await allowed in modern node; if not, use .connect().then(...)
 
 // make logged-in user available to all templates
@@ -485,4 +501,6 @@ app.use((err, req, res, next) => {
 });
 
 // Start server
-app.listen(port, () => console.log(`Server running on http://localhost:${port}`));
+app.listen(port, () => {
+  console.log(`Server running on port ${port}`);
+});
