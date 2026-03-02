@@ -6,98 +6,134 @@ import csv from "csv-parser";
 dotenv.config();
 
 const { Client } = pg;
+const FINAL_CSV = "./books_1.Best_Books_Ever.csv";
 
-const FINAL_CSV = './books_1.Best_Books_Ever.csv';
+// Database connection
+const db = new Client(
+  process.env.DATABASE_URL
+    ? {
+        connectionString: process.env.DATABASE_URL,
+        ssl: { rejectUnauthorized: false },
+      }
+    : {
+        user: process.env.DB_USER,
+        host: process.env.DB_HOST,
+        database: process.env.DB_NAME,
+        password: process.env.DB_PASSWORD,
+        port: process.env.DB_PORT,
+      }
+);
 
-const db = new Client({
-  user: process.env.DB_USER,
-  host: process.env.DB_HOST,
-  database: process.env.DB_NAME,
-  password: process.env.DB_PASSWORD,
-  port: process.env.DB_PORT,
-});
-
-const cleanGenres = (genresString) => {
+// --- Helper function to clean genres ---
+function cleanGenres(genresString) {
   if (!genresString) return null;
-  let cleaned = genresString.replace(/^[\[]/, '').replace(/[\]]$/, '');
-  cleaned = cleaned.replace(/'/g, '').replace(/\s+/g, ' ').trim();
-  if (cleaned === "") return null;
-  return cleaned;
-};
-
-async function upsertBook(client, bookData) {
-  const sql = `
-    INSERT INTO books (title, author, genre, rating, description, cover_url, display_order)
-    VALUES ($1, $2, $3, $4, $5, $6, $7)
-    ON CONFLICT (title, author) DO NOTHING;
-  `;
-  const params = [
-    bookData.title,
-    bookData.author,
-    bookData.genre,
-    bookData.rating,
-    bookData.description,
-    bookData.cover_url,
-    bookData.display_order
-  ];
-  await client.query(sql, params);
+  let cleaned = genresString.replace(/^[\[]/, "").replace(/[\]]$/, "");
+  cleaned = cleaned.replace(/'/g, "").replace(/\s+/g, " ").trim();
+  return cleaned === "" ? null : cleaned;
 }
 
 async function runSeed() {
   await db.connect();
   console.log("✅ Connected to DB — starting CSV seed...");
 
-  // --- Step 1: Ensure display_order column exists ---
+  // ✅ Ensure unique constraint exists for ON CONFLICT to work
   await db.query(`
-    ALTER TABLE books 
-    ADD COLUMN IF NOT EXISTS display_order INTEGER;
+    DO $$
+    BEGIN
+      IF NOT EXISTS (
+        SELECT 1
+        FROM pg_constraint
+        WHERE conname = 'unique_title_author'
+      ) THEN
+        ALTER TABLE books ADD CONSTRAINT unique_title_author UNIQUE (title, author);
+      END IF;
+    END
+    $$;
   `);
 
-  // --- Step 2: Clear old data ---
-  await db.query('DELETE FROM books;');
+  // ✅ Ensure display_order column exists
+  await db.query(`ALTER TABLE books ADD COLUMN IF NOT EXISTS display_order INTEGER;`);
+
+  // ✅ Clear old data
+  await db.query("DELETE FROM books;");
   console.log("🧹 Old data cleared.");
 
   let totalInserted = 0;
-  let displayOrderCounter = 1; // start order from 1
+  let displayOrder = 1;
+  const BATCH_SIZE = 100;
+  let batch = [];
 
   const stream = fs.createReadStream(FINAL_CSV).pipe(csv());
 
-  stream.on('data', async (row) => {
-    stream.pause();
-
-    const bookData = {
-      title: row['title']?.trim() || null,
-      author: row['author']?.trim() || null,
-      rating: parseFloat(row['rating']) || null,
-      description: row['description']?.trim() || null,
-      cover_url: row['coverImg']?.trim() || null,
-      genre: cleanGenres(row['genres']),
-      display_order: displayOrderCounter++
-    };
-
-    if (bookData.title && bookData.author) {
-      try {
-        await upsertBook(db, bookData);
-        totalInserted++;
-      } catch (err) {
-        console.error(`⚠️ DB error for "${bookData.title}": ${err.message}`);
-      }
+  // Insert a batch of rows
+  async function insertBatch(rows) {
+    if (rows.length === 0) return;
+    const values = [];
+    const params = [];
+    let i = 1;
+    for (const r of rows) {
+      values.push(
+        `($${i++}, $${i++}, $${i++}, $${i++}, $${i++}, $${i++}, $${i++})`
+      );
+      params.push(
+        r.title,
+        r.author,
+        r.genre,
+        r.rating,
+        r.description,
+        r.cover_url,
+        r.display_order
+      );
     }
 
-    stream.resume();
+    const sql = `
+      INSERT INTO books (title, author, genre, rating, description, cover_url, display_order)
+      VALUES ${values.join(", ")}
+      ON CONFLICT (title, author) DO NOTHING;
+    `;
+    await db.query(sql, params);
+    totalInserted += rows.length;
+    console.log(`📚 Inserted ${rows.length} books (Total: ${totalInserted})`);
+  }
+
+  stream.on("data", (row) => {
+    const book = {
+      title: row["title"]?.trim() || null,
+      author: row["author"]?.trim() || null,
+      rating: parseFloat(row["rating"]) || null,
+      description: row["description"]?.trim() || null,
+      cover_url: row["coverImg"]?.trim() || null,
+      genre: cleanGenres(row["genres"]),
+      display_order: displayOrder++,
+    };
+
+    if (book.title && book.author) batch.push(book);
+
+    if (batch.length >= BATCH_SIZE) {
+      stream.pause();
+      insertBatch(batch.splice(0, batch.length))
+        .then(() => stream.resume())
+        .catch((err) => {
+          console.error("⚠️ Batch insert error:", err.message);
+          stream.resume();
+        });
+    }
   });
 
-  await new Promise((resolve, reject) => {
-    stream.on('end', resolve);
-    stream.on('error', reject);
+  stream.on("end", async () => {
+    await insertBatch(batch);
+    console.log(`✅ Finished seeding! Total books inserted: ${totalInserted}`);
+    await db.end();
+    console.log("🔒 DB connection closed.");
   });
 
-  console.log(`✅ Finished. Total books inserted: ${totalInserted}`);
-  await db.end();
-  console.log("🔒 DB closed. Done.");
+  stream.on("error", (err) => {
+    console.error("❌ Stream error:", err);
+    db.end();
+  });
 }
 
-runSeed().catch(err => {
-  console.error("❌ Fatal error during seed:", err);
+runSeed().catch((err) => {
+  console.error("❌ Fatal error:", err);
   db.end();
 });
