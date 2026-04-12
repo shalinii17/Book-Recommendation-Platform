@@ -120,9 +120,10 @@ body {
 
 /* ---- PAGE CONTAINER ---- */
 .page-container {
-    max-width: 1200px;
+    max-width: 1400px;
+    width: 100%;
     margin: 0 auto;
-    padding: 2rem 1.5rem;
+    padding: 2rem 2rem;
     flex: 1;
 }
 
@@ -210,9 +211,10 @@ body {
 /* ---- BOOKS GRID ---- */
 .books-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-    gap: 1.5rem;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 1.25rem;
     margin-bottom: 2.5rem;
+    width: 100%;
 }
 
 .book-card {
