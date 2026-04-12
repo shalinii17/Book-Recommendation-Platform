@@ -1,140 +1,87 @@
 <%- include("partials/header.ejs") %>
 
-<div class="container mt-4">
-    <div class="d-flex justify-content-end align-items-center mb-3">
-        <% if (user) { %>
-            <div>
-                <a href="/profile" class="btn btn-outline-primary">My Profile</a>
-                <a href="/logout" class="btn btn-danger">Logout</a>
-            </div>
-        <% } else { %>
-            <div>
-                <a href="/login" class="btn btn-outline-secondary">Login</a>
-                <a href="/signup" class="btn btn-outline-secondary">Sign Up</a>
-            </div>
-        <% } %>
+<div class="page-container">
+
+    <!-- Hero -->
+    <div class="hero-section">
+        <h1 class="hero-title">Discover Your Next <span class="accent">Great Read</span></h1>
+        <p class="hero-subtitle">Browse thousands of books, save your favourites, and build your reading list.</p>
     </div>
 
-    <form action="/" method="GET" class="row g-3 mb-3">
-        <div class="col-md-4">
-            <input type="text" name="query" class="form-control" placeholder="Search by title or author" value="<%= query || '' %>">
-        </div>
-        <div class="col-md-3">
-            <input type="text" name="genre" class="form-control" placeholder="Genre" value="<%= genre || '' %>">
-        </div>
-        <div class="col-md-2">
-            <input type="number" name="rating" step="0.1" min="1" max="5" class="form-control" placeholder="Min rating" value="<%= rating || '' %>">
-        </div>
-        
-        <input type="hidden" name="page" value="1"> 
-        
-        <div class="col-md-1">
-            <button class="btn btn-primary w-100">Search</button>
-        </div>
-        <div class="col-md-2">
-            <a href="/" class="btn btn-secondary w-100">Clear</a>
-        </div>
+    <!-- Search Bar -->
+    <form action="/" method="GET" class="search-bar">
+        <input type="text" name="query" class="search-input" placeholder="Search by title or author..." value="<%= query || '' %>">
+        <input type="text" name="genre" class="search-input" placeholder="Genre..." value="<%= genre || '' %>">
+        <input type="hidden" name="page" value="1">
+        <button class="search-btn" type="submit">Search</button>
+        <a href="/" class="clear-btn">Clear</a>
     </form>
 
-    <table class="table table-bordered table-striped text-center align-middle book-table">
-        <thead class="table-dark">
-            <tr>
-                <th>Cover</th>
-                <th>Book Name</th>
-                <th>Author</th>
-                <th>Description</th>
-                <th>Actions</th>
-            </tr>
-        </thead>
-        <tbody>
-            <% if (books && books.length > 0) { %>
-                <% books.forEach(book => { %>
-                    <tr>
-                        <td class="cover-cell">
-                            <% if (book.cover_url) { %>
-                                <img src="<%= book.cover_url %>" alt="cover" class="book-cover">
-                            <% } else { %>
-                                <span>No Cover</span>
-                            <% } %>
-                        </td>
-                        <td class="title-cell">
-                            <span title="<%= book.title %>"><%= book.title %></span>
-                        </td>
-
-                        <td class="author-cell">
-                            <span title="<%= book.author %>"><%= book.author %></span>
-                        </td>
-
-                        <td class="description-cell">
-                            <span title="<%= book.description || '' %>">
-                                <%= book.description ? (book.description.length > 100 ? book.description.slice(0, 100) + "..." : book.description) : "" %>
-                            </span>
-                        </td>
-
-                        <td>
-                            <% if (user) { %>
+    <!-- Books Grid -->
+    <% if (books && books.length > 0) { %>
+        <div class="books-grid">
+            <% books.forEach(book => { %>
+                <div class="book-card">
+                    <div class="book-cover-wrap">
+                        <% if (book.cover_url) { %>
+                            <img src="<%= book.cover_url %>" alt="<%= book.title %>" class="book-cover-img">
+                        <% } else { %>
+                            <div class="book-cover-placeholder">No Cover</div>
+                        <% } %>
+                    </div>
+                    <div class="book-info">
+                        <h3 class="book-title" title="<%= book.title %>"><%= book.title %></h3>
+                        <p class="book-author"><%= book.author %></p>
+                        <% if (book.genre) { %>
+                            <span class="book-genre"><%= book.genre.split(',')[0].trim() %></span>
+                        <% } %>
+                        <% if (book.description) { %>
+                            <p class="book-desc"><%= book.description.length > 80 ? book.description.slice(0, 80) + '...' : book.description %></p>
+                        <% } %>
+                        <% if (user) { %>
+                            <div class="book-actions">
                                 <form action="/mark" method="POST" style="display:inline">
                                     <input type="hidden" name="book_id" value="<%= book.id %>">
-                                    <input type="hidden" name="action" value="read">
+                                    <input type="hidden" name="action" value="already read">
                                     <input type="hidden" name="redirect" value="/">
-                                    <button class="btn btn-sm btn-outline-primary">Mark Read</button>
+                                    <button class="action-btn btn-read">Read</button>
                                 </form>
                                 <form action="/mark" method="POST" style="display:inline">
                                     <input type="hidden" name="book_id" value="<%= book.id %>">
                                     <input type="hidden" name="action" value="recommend">
                                     <input type="hidden" name="redirect" value="/">
-                                    <button class="btn btn-sm btn-outline-success">Recommend</button>
+                                    <button class="action-btn btn-recommend">Recommend</button>
                                 </form>
                                 <form action="/mark" method="POST" style="display:inline">
                                     <input type="hidden" name="book_id" value="<%= book.id %>">
                                     <input type="hidden" name="action" value="save">
                                     <input type="hidden" name="redirect" value="/">
-                                    <button class="btn btn-sm btn-outline-warning">Save</button>
+                                    <button class="action-btn btn-save">Save</button>
                                 </form>
-                            <% } else { %>
-                                <small><a href="/login">Login to save</a></small>
-                            <% } %>
-                        </td>
-                    </tr>
-                <% }) %>
-            <% } else { %>
-                <tr><td colspan="6">No books found matching your criteria.</td></tr>
-            <% } %>
-        </tbody>
-    </table>
-    
-    <nav aria-label="Page navigation" class="mt-4">
-        <ul class="pagination justify-content-center">
-            
-            <% // 1. Previous Button %>
-            <li class="page-item <%= currentPage <= 1 ? 'disabled' : '' %>">
-                <a class="page-link" 
-                   href="/?query=<%= query || '' %>&genre=<%= genre || '' %>&rating=<%= rating || '' %>&page=<%= currentPage - 1 %>" 
-                   aria-label="Previous">
-                    <span aria-hidden="true">&laquo;</span>
-                </a>
-            </li>
+                            </div>
+                        <% } else { %>
+                            <a href="/login" class="login-prompt">Login to save</a>
+                        <% } %>
+                    </div>
+                </div>
+            <% }) %>
+        </div>
+    <% } else { %>
+        <div class="empty-state">
+            <p>No books found matching your criteria.</p>
+            <a href="/" class="clear-btn">Clear filters</a>
+        </div>
+    <% } %>
 
-            <% // 2. Current Page Display (Simplified) %>
-            <li class="page-item active">
-                <span class="page-link">
-                    Page <%= currentPage %> of <%= totalPages %>
-                </span>
-            </li>
+    <!-- Pagination -->
+    <div class="pagination-wrap">
+        <a href="/?query=<%= query || '' %>&genre=<%= genre || '' %>&page=<%= currentPage - 1 %>"
+           class="page-btn <%= currentPage <= 1 ? 'disabled' : '' %>">&laquo; Prev</a>
+        <span class="page-info">Page <%= currentPage %> of <%= totalPages %></span>
+        <a href="/?query=<%= query || '' %>&genre=<%= genre || '' %>&page=<%= currentPage + 1 %>"
+           class="page-btn <%= currentPage >= totalPages ? 'disabled' : '' %>">Next &raquo;</a>
+    </div>
 
-            <% // 3. Next Button %>
-            <li class="page-item <%= currentPage >= totalPages ? 'disabled' : '' %>">
-                <a class="page-link" 
-                   href="/?query=<%= query || '' %>&genre=<%= genre || '' %>&rating=<%= rating || '' %>&page=<%= currentPage + 1 %>" 
-                   aria-label="Next">
-                    <span aria-hidden="true">&raquo;</span>
-                </a>
-            </li>
-            
-        </ul>
-        <p class="text-center text-muted"><%= totalPages %> pages total.</p>
-    </nav>
-    
 </div>
 
 <%- include("partials/footer.ejs") %>

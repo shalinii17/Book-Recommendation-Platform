@@ -73,21 +73,20 @@ async function runSeed() {
     let i = 1;
     for (const r of rows) {
       values.push(
-        `($${i++}, $${i++}, $${i++}, $${i++}, $${i++}, $${i++}, $${i++})`
-      );
+  `($${i++}, $${i++}, $${i++}, $${i++}, $${i++}, $${i++})`
+);
       params.push(
         r.title,
         r.author,
         r.genre,
         r.rating,
         r.description,
-        r.cover_url,
-        r.display_order
+        r.cover_url
       );
     }
 
     const sql = `
-      INSERT INTO books (title, author, genre, rating, description, cover_url, display_order)
+      INSERT INTO books (title, author, genre, rating, description, cover_url)
       VALUES ${values.join(", ")}
       ON CONFLICT (title, author) DO NOTHING;
     `;
