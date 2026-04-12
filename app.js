@@ -371,7 +371,7 @@ app.get("/", async (req, res) => {
             SELECT id, title, author, genre, description, cover_url
             FROM books
             ${filterSql}
-            ORDER BY display_order ASC NULLS LAST
+            ORDER BY rating DESC NULLS LAST
             LIMIT $${params.length + 1}
             OFFSET $${params.length + 2};
         `;
